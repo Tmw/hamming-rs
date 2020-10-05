@@ -1,11 +1,9 @@
 // TODO: 
-// - Break out the BitVec module
-// - Can we flip the order of most of the ranges (16..0)? and shift the data right and and with a
-// one instead?
+// refactor. Better iterators, do bit shifting the better way, etc..
 //
-// Add function that randomly flips a bit
-// Add a function that repairs errors
-// done.
+
+use rand;
+
 struct BitVec {
     source: Vec<u8>,
     index: usize
@@ -37,31 +35,31 @@ impl Iterator for BitVec {
 }
 
 fn main() {
-    let blocks : Blocks = Blocks::from("abc");
+    let blocks : Blocks = Blocks::from("This long and too long much more and now it works for some reason?");
 
     let blocks = Blocks(blocks.0.iter().map(|block| {
         let parity = calculate_parity(block);
         assign_parity(block, &parity)
     }).collect());
 
-    for block in &blocks.0 {
-        print_block(block);
-    }
 
-    let out = to_string(blocks);
-    println!("After encode and decode: {}", out);
+    let out = to_string(&blocks);
+    println!("Decode without noise:\t {}", out);
+
+    // introduce some noise
+    let with_noise = Blocks(blocks.0.iter().map(flip_random_bit).collect());
+
+    let disturbed_out = to_string(&with_noise);
+    println!("decode with noise:\t {}", disturbed_out);
+
+    let repaired = repair(&with_noise);
+    println!("Repaired:\t\t {}", to_string(&repaired));
 }
 
 struct Blocks (Vec<u16>);
 impl From<&str> for Blocks {
     fn from(data: &str) -> Blocks {
-        Blocks::from(data.as_bytes())
-    }
-}
-
-impl From<&[u8]> for Blocks {
-    fn from(data: &[u8]) -> Blocks {
-        Blocks::new(data)
+        Blocks::new(data.as_bytes())
     }
 }
 
@@ -92,11 +90,31 @@ impl Blocks {
     }
 }
 
-fn to_string(blocks: Blocks) -> String {
+fn repair(blocks: &Blocks) -> Blocks {
+    Blocks(blocks.0.iter().map(|block| {
+
+        match calculate_parity(&block) {
+            0 => *block,
+            err => block ^ (0b1 << 15 - err as u16),
+        }
+
+
+
+    }).collect())
+}
+
+fn flip_random_bit(block: &u16) -> u16 {
+    match rand::random() {
+        true => block.to_owned() ^ 0b1 << rand::random::<u8>() % 15,
+        false => block.to_owned(),
+    }
+}
+
+fn to_string(blocks: &Blocks) -> String {
     let mut bits:Vec<bool> = Vec::new();
 
     // convert the blocks into a long stream of booleans
-    for block in blocks.0 {
+    for block in &blocks.0 {
         for bit in 1..16 {
 
             // don't read the parity bits as data
@@ -108,7 +126,7 @@ fn to_string(blocks: Blocks) -> String {
         }
     }
 
-    let mut bytes: Vec<u8> = Vec::new();
+    let mut bytes: Vec<char> = Vec::new();
 
     // then from that vector; chunks of 8 to get the bits
     for chunk in bits.chunks(8) {
@@ -124,10 +142,11 @@ fn to_string(blocks: Blocks) -> String {
             }
         }
 
-        &bytes.push(byte);
+        &bytes.push(char::from(byte));
     }
 
-    String::from_utf8(bytes).unwrap_or_default()
+
+    bytes.into_iter().collect()
 }
 
 
