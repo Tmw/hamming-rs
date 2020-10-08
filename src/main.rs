@@ -1,62 +1,73 @@
-// TODO: 
-// refactor. Better iterators, do bit shifting the better way, etc..
-//
+mod bitvec;
 
 use rand;
-
-struct BitVec {
-    source: Vec<u8>,
-    index: usize
-}
-
-impl BitVec {
-    fn from_bytes(data: &[u8]) -> Self {
-        BitVec {
-            source: Vec::from(data),
-            index: 0
-        }
-    }
-}
-
-impl Iterator for BitVec {
-    type Item = bool;
-
-    fn next(&mut self) -> Option<bool> {
-        let byte_index = self.index / 8;
-        let bit_index = self.index % 8;
-
-        if let Some(current_byte) = self.source.get(byte_index) {
-            self.index = self.index + 1;
-            Some(current_byte & (0b1 << 7 - bit_index) > 0)
-        } else {
-            None
-        }
-    }
-}
+use bitvec::BitVec;
 
 fn main() {
-    let blocks : Blocks = Blocks::from("This long and too long much more and now it works for some reason?");
+    let mut blocks : Blocks = Blocks::from("abc");
 
-    let blocks = Blocks(blocks.0.iter().map(|block| {
-        let parity = calculate_parity(block);
-        assign_parity(block, &parity)
-    }).collect());
+    println!("Before noise:\t {}", &blocks.to_string());
 
+    for block in &mut blocks.0 {
+        block.flip_random_bit();
+    }
 
-    let out = to_string(&blocks);
-    println!("Decode without noise:\t {}", out);
+    println!("After noise:\t {}", &blocks.to_string());
 
-    // introduce some noise
-    let with_noise = Blocks(blocks.0.iter().map(flip_random_bit).collect());
+    for block in &mut blocks.0 {
+        block.repair()
+    }
 
-    let disturbed_out = to_string(&with_noise);
-    println!("decode with noise:\t {}", disturbed_out);
-
-    let repaired = repair(&with_noise);
-    println!("Repaired:\t\t {}", to_string(&repaired));
+    println!("Repaired:\t {}", &blocks.to_string());
 }
 
-struct Blocks (Vec<u16>);
+struct Block {
+    data: u16
+}
+
+impl Block {
+    fn from(data: u16) -> Self {
+        let mut block = Block { data: data };
+        block.assign_parity(&block.parity());
+        block
+    }
+
+    fn parity(&self) -> u8 {
+        (0..16)
+            .filter(|bit| &self.data & (0b1 << 15 - bit) as u16 > 0)
+            .fold(0u8, |acc, bit| acc ^ bit)
+    }
+
+    fn assign_parity(&mut self, parity: &u8){
+        self.data =
+            (0..4)
+                .fold(self.data, |acc, bit| {
+                    let parity_bit = match parity & (0b1 << bit) > 0 {
+                        true => 0b1,
+                        false => 0b0
+                    };
+
+                    acc | parity_bit << 15 - 2u8.pow(bit)
+                });
+    }
+
+    fn repair(&mut self) {
+        match self.parity() {
+            0 => (),
+            err => {
+                self.data ^= 0b1 << 15 - err as u16;
+            },
+        }
+    }
+
+    fn flip_random_bit(&mut self) {
+        if rand::random() {
+            self.data ^= 0b1 << rand::random::<u8>() % 15
+        }
+    }
+}
+
+struct Blocks(Vec<Block>);
 impl From<&str> for Blocks {
     fn from(data: &str) -> Blocks {
         Blocks::new(data.as_bytes())
@@ -73,102 +84,69 @@ impl Blocks {
 
         // iterate until theres no more bits
         while bits.peek().is_some() {
-            let block = (1..16)
-                .filter(|i|  !usize::is_power_of_two(*i))
-                .fold(0u16, |acc, i| {
+            let block = (0..15).rev()
+                .filter(|bit|  !usize::is_power_of_two(15 - *bit))
+                .fold(0u16, |block, bit| {
                     match bits.next() {
-                        Some(true) =>  acc | (0b1 << 15 - i),
-                        Some(false) => acc | (0b0 << 15 - i),
-                        None => acc
+                        Some(true) =>  block | 0b1 << bit,
+                        Some(false) => block | 0b0 << bit,
+                        None => block
                     }
                 });
 
-            blocks.push(block)
+            blocks.push(Block::from(block))
         }
 
         Blocks(blocks)
     }
-}
 
-fn repair(blocks: &Blocks) -> Blocks {
-    Blocks(blocks.0.iter().map(|block| {
+    fn repair(&mut self) {
+        for block in &mut self.0 {
+            block.repair();
+        }
+    }
 
-        match calculate_parity(&block) {
-            0 => *block,
-            err => block ^ (0b1 << 15 - err as u16),
+    fn to_string(&self) -> String {
+        let mut bits:Vec<bool> = Vec::new();
+
+        // convert the blocks into a long stream of booleans
+        for block in &self.0 {
+            for bit in 1..16 {
+
+                // don't read the parity bits as data
+                if usize::is_power_of_two(bit) {
+                    continue;
+                }
+
+                bits.push(block.data & 0b1 << 15 - bit > 0)
+            }
         }
 
+        let mut bytes: Vec<char> = Vec::new();
 
-
-    }).collect())
-}
-
-fn flip_random_bit(block: &u16) -> u16 {
-    match rand::random() {
-        true => block.to_owned() ^ 0b1 << rand::random::<u8>() % 15,
-        false => block.to_owned(),
-    }
-}
-
-fn to_string(blocks: &Blocks) -> String {
-    let mut bits:Vec<bool> = Vec::new();
-
-    // convert the blocks into a long stream of booleans
-    for block in &blocks.0 {
-        for bit in 1..16 {
-
-            // don't read the parity bits as data
-            if usize::is_power_of_two(bit) {
+        // then from that vector; chunks of 8 to get the bits
+        for chunk in bits.chunks(8) {
+            if chunk.len() < 8 {
                 continue;
             }
+            let mut byte = 0u8;
 
-            bits.push(block & 0b1 << 15 - bit > 0)
-        }
-    }
-
-    let mut bytes: Vec<char> = Vec::new();
-
-    // then from that vector; chunks of 8 to get the bits
-    for chunk in bits.chunks(8) {
-        if chunk.len() < 8 {
-            continue;
-        }
-        let mut byte = 0u8;
-
-        for (idx, bit) in chunk.iter().enumerate() {
-            match bit {
-                true =>  byte |= 0b1 << 7- idx,
-                false => byte |= 0b0 << 7 - idx,
+            for (idx, bit) in chunk.iter().enumerate() {
+                match bit {
+                    true =>  byte |= 0b1 << 7 - idx,
+                    false => byte |= 0b0 << 7 - idx,
+                }
             }
+
+            &bytes.push(char::from(byte));
         }
 
-        &bytes.push(char::from(byte));
+
+        bytes.into_iter().collect()
     }
-
-
-    bytes.into_iter().collect()
 }
 
-
-fn calculate_parity(data: &u16) -> u8 {
-    (0..16)
-        .filter(|bit| data & (0b1 << 15 - bit) as u16 > 0)
-        .fold(0u8, |acc, bit| acc ^ bit)
-}
-
-// assign parity bits in using big endian
-fn assign_parity(data: &u16, parity: &u8) -> u16 {
-    (0..4)
-        .fold(*data, |acc, bit| {
-            let parity_bit = match parity & (0b1 << bit) > 0 {
-                true => 0b1,
-                false => 0b0
-            };
-
-            acc | parity_bit << 15 - 2u8.pow(bit)
-        })
-}
-
+// This should be the fmt::Display trait? Then you can just use it as println!()?
 fn print_block(block: &u16) {
     for bit in 0..16 {
 
