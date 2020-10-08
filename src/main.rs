@@ -1,23 +1,24 @@
+// TODO:
+// - Refactor. Better iterators
+// - Blogpost
+//
 mod bitvec;
 
 use rand;
 use bitvec::BitVec;
 
 fn main() {
-    let mut blocks : Blocks = Blocks::from("abc");
-
+    // initial loading data in Hamming code and assign parity
+    let mut blocks : Blocks = Blocks::from("a bit longer string");
     println!("Before noise:\t {}", &blocks.to_string());
 
-    for block in &mut blocks.0 {
-        block.flip_random_bit();
-    }
-
+    // introduce noise randomly to the blocks and see its output
+    blocks.introduce_noise();
     println!("After noise:\t {}", &blocks.to_string());
 
-    for block in &mut blocks.0 {
-        block.repair()
-    }
 
+    // then repair using the parity
+    blocks.repair();
     println!("Repaired:\t {}", &blocks.to_string());
 }
 
@@ -27,22 +28,26 @@ struct Block {
 
 impl Block {
     fn from(data: u16) -> Self {
-        let mut block = Block { data: data };
+        let mut block = Block {
+            data: data
+        };
+
         block.assign_parity(&block.parity());
+
         block
     }
 
     fn parity(&self) -> u8 {
         (0..16)
-            .filter(|bit| &self.data & (0b1 << 15 - bit) as u16 > 0)
+            .filter(|bit| &self.data >> 15 - bit & 0b1 > 0)
             .fold(0u8, |acc, bit| acc ^ bit)
     }
 
     fn assign_parity(&mut self, parity: &u8){
         self.data =
-            (0..4)
+            (0..4).rev()
                 .fold(self.data, |acc, bit| {
-                    let parity_bit = match parity & (0b1 << bit) > 0 {
+                    let parity_bit = match parity >> bit & 0b1 > 0 {
                         true => 0b1,
                         false => 0b0
                     };
@@ -61,9 +66,7 @@ impl Block {
     }
 
     fn flip_random_bit(&mut self) {
-        if rand::random() {
-            self.data ^= 0b1 << rand::random::<u8>() % 15
-        }
+        self.data ^= 0b1 << rand::random::<u8>() % 15
     }
 }
 
@@ -100,6 +103,14 @@ impl Blocks {
         Blocks(blocks)
     }
 
+    fn introduce_noise(&mut self) {
+        for block in &mut self.0 {
+            if rand::random() {
+                block.flip_random_bit();
+            }
+        }
+    }
+
     fn repair(&mut self) {
         for block in &mut self.0 {
             block.repair();
@@ -107,6 +118,7 @@ impl Blocks {
     }
 
     fn to_string(&self) -> String {
+        // TODO: Refactor this to a more functional style
         let mut bits:Vec<bool> = Vec::new();
 
         // convert the blocks into a long stream of booleans
@@ -118,7 +130,7 @@ impl Blocks {
                     continue;
                 }
 
-                bits.push(block.data & 0b1 << 15 - bit > 0)
+                bits.push(block.data >> 15 - bit & 0b1 > 0)
             }
         }
 
@@ -156,7 +168,7 @@ fn print_block(block: &u16) {
         }
 
         // determine the value
-        let value = match block & (0b1 << 15 - bit) > 0 {
+        let value = match block >> 15 - bit & 0b1 > 0 {
             true => "1",
             false => "0"
         };
