@@ -1,14 +1,10 @@
-mod bitvec;
-mod block;
-mod blocks;
-
-use blocks::Blocks;
+use hamming::blocks::Blocks;
 
 fn main() {
     let input = get_input();
 
     // initial loading data in Hamming code and assign parity
-    let mut blocks : Blocks = Blocks::from(&input[..]);
+    let mut blocks: Blocks = Blocks::from(&input[..]);
     println!("Before noise:\t {}", &blocks.to_string());
 
     // introduce noise randomly to the blocks and see its output
@@ -25,4 +21,3 @@ fn get_input() -> String {
         .nth(1)
         .unwrap_or(String::from("This is a sample string"))
 }
-
