@@ -10,6 +10,10 @@ impl BitVec {
             index: 0,
         }
     }
+
+    pub fn len(&self) -> usize {
+        self.source.len()
+    }
 }
 
 impl Iterator for BitVec {
@@ -41,5 +45,19 @@ mod bitvec_tests {
         for expected_bit in expected.iter() {
             assert_eq!(*expected_bit, bitvec.next().unwrap())
         }
+    }
+
+    #[test]
+    fn iterator_iterates_correct_amount() {
+        let mut bitvec = BitVec::from_bytes(&[255, 255, 255]).peekable();
+
+        // we can iterate 3 * 8 = 24 times and fully exhaust the iterator
+        for _ in 0..(3 * 8) {
+            assert!(bitvec.peek().is_some());
+            assert!(bitvec.next().is_some());
+        }
+
+        // but then we're at the end
+        assert_eq!(bitvec.next(), None);
     }
 }
