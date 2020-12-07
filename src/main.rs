@@ -1,26 +1,15 @@
-use clap::{App, Arg, SubCommand};
 use hamming::blocks::Blocks;
 use std::io::{Read, Write};
+mod cli;
 
-fn main() {
-    let encode_command = SubCommand::with_name("encode")
-        .about("Encode a given value, either as argument or reading from STDIN")
-        .arg(Arg::with_name("input").help("Input string to encode"));
-
-    let decode_command =
-        SubCommand::with_name("decode").about("Decode a given hamming value; reads from STDIN");
-
-    let matches = App::new("Hamming")
-        .about("Encode and decode bytes using Hamming")
-        .subcommand(encode_command)
-        .subcommand(decode_command)
-        .get_matches();
-
-    match matches.subcommand() {
+fn main() -> Result<(), std::io::Error> {
+    match cli::setup().subcommand() {
         ("encode", Some(args)) => CLI::new(args).map(|cli| cli.encode()),
         ("decode", Some(args)) => CLI::new(args).map(|cli| cli.decode()),
         _ => None,
     };
+
+    Ok(())
 }
 
 struct CLI {

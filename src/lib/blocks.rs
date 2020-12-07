@@ -1,6 +1,4 @@
 #![allow(dead_code)]
-use rand;
-
 use std::iter::FromIterator;
 
 use super::bitvec::BitVec;
@@ -45,18 +43,12 @@ impl Blocks {
         index == 0 || index.is_power_of_two()
     }
 
+    /// return an iterator to the underlying vec
     pub fn iter(&self) -> std::slice::Iter<'_, Block> {
         self.0.iter()
     }
 
-    pub fn introduce_noise(&mut self) {
-        for block in &mut self.0 {
-            if rand::random() {
-                block.flip_random_bit();
-            }
-        }
-    }
-
+    /// Repair blocks based on their parity bits
     pub fn repair(&mut self) {
         for block in &mut self.0 {
             block.repair();

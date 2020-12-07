@@ -7,7 +7,7 @@ pub struct Block {
 impl From<u16> for Block {
     fn from(data: u16) -> Self {
         let mut block = Block { data: data };
-        block.assign_parity(&block.parity());
+        block.prepare();
         block
     }
 }
@@ -39,13 +39,17 @@ impl fmt::Display for Block {
 }
 
 impl Block {
+    /// return parity bits for the given block
     pub fn parity(&self) -> u8 {
         (0..16)
             .filter(|bit| &self.data >> 15 - bit & 0b1 > 0)
             .fold(0u8, |acc, bit| acc ^ bit)
     }
 
-    pub fn assign_parity(&mut self, parity: &u8) {
+    /// prepare the block by calculating and assigning its parity
+    pub fn prepare(&mut self) {
+        let parity = &self.parity();
+
         self.data = (0..4).rev().fold(self.data, |acc, bit| {
             let parity_bit = match parity >> bit & 0b1 > 0 {
                 true => 0b1,
@@ -56,17 +60,12 @@ impl Block {
         });
     }
 
+    /// repair the block based on its parity bits
     pub fn repair(&mut self) {
         match self.parity() {
-            0 => (),
-            err => {
-                self.data ^= 0b1 << 15 - err as u16;
-            }
+            err if err > 0 => self.data ^= 0b1 << 15 - err as u16,
+            _ => ()
         }
-    }
-
-    pub fn flip_random_bit(&mut self) {
-        self.data ^= 0b1 << rand::random::<u8>() % 15
     }
 }
 
@@ -92,7 +91,7 @@ mod block_test {
         let data: u16 = 0b00010101001110011;
         let mut block = Block::from(data);
         let before_data = block.data;
-        block.flip_random_bit();
+        flip_random_bit(&mut block);
         let after_data = block.data;
 
         assert_ne!(before_data, after_data)
@@ -103,9 +102,13 @@ mod block_test {
         let data: u16 = 0b00010101001110011;
         let mut block = Block::from(data);
         let original_data = block.data;
-        block.flip_random_bit();
+        flip_random_bit(&mut block);
         block.repair();
 
         assert_eq!(block.data, original_data)
+    }
+
+    fn flip_random_bit(block: &mut Block) {
+        block.data ^= 0b1 << rand::random::<u8>() % 15
     }
 }
