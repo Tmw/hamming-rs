@@ -1,54 +1,49 @@
-use hamming::blocks::Blocks;
-use std::io::{Read, Write};
 mod cli;
+use anyhow::bail;
 
-fn main() -> Result<(), std::io::Error> {
-    match cli::setup().subcommand() {
-        ("encode", Some(args)) => CLI::new(args).map(|cli| cli.encode()),
-        ("decode", Some(args)) => CLI::new(args).map(|cli| cli.decode()),
-        _ => None,
-    };
-
-    Ok(())
+fn main() -> anyhow::Result<()> {
+    match cli::get_matches().subcommand() {
+        ("encode", Some(args)) => app::encode(args),
+        ("decode", Some(args)) => app::decode(args),
+        _ => bail!("command not recognized"),
+    }
 }
 
-struct CLI {
-    input: Vec<u8>,
-}
+mod app {
+    use clap::ArgMatches;
+    use std::io::{Read, Write, stdin, stdout};
+    use hamming::blocks::Blocks;
 
-// TODO: Have proper error handling here?
-impl CLI {
-    fn new(args: &clap::ArgMatches) -> Option<Self> {
-        if args.is_present("input") {
-            let input = args
-                .value_of("input")
-                .expect("expected input to have a value");
+    fn stdin_input() -> anyhow::Result<Vec<u8>> {
+        let mut buff: Vec<u8> = Vec::new();
+        stdin().read_to_end(&mut buff)?;
 
-            return Some(CLI {
-                input: input.as_bytes().to_owned(),
-            });
+        Ok(buff)
+    }
+
+    fn parse_input(args: &ArgMatches) -> anyhow::Result<Vec<u8>> {
+        if let Some(input) = args.value_of("input") {
+            return Ok(input.as_bytes().to_owned());
         }
 
-        // input was not passed, attempt to read from stdin
-        let mut buff: Vec<u8> = Vec::new();
-        std::io::stdin()
-            .read_to_end(&mut buff)
-            .expect("Error reading from STDIN");
-
-        Some(CLI { input: buff })
+        stdin_input()
     }
 
-    fn encode(&self) {
-        let blocks: Blocks = Blocks::new(&self.input[..], false);
+    pub(super) fn encode(args: &ArgMatches) -> anyhow::Result<()> {
+        let input = parse_input(args)?;
+
+        let blocks: Blocks = Blocks::new(&input[..], false);
         let out = blocks.to_byte_vec();
-        std::io::stdout()
-            .write_all(out.as_slice())
-            .expect("Error writing to STDOUT")
+        stdout().write_all(out.as_slice())?;
+        Ok(())
     }
 
-    fn decode(&self) {
-        let mut blocks: Blocks = Blocks::new(&self.input[..], true);
+    pub(super) fn decode(args: &ArgMatches) -> anyhow::Result<()> {
+        let input = parse_input(args)?;
+        let mut blocks: Blocks = Blocks::new(&input[..], true);
         &blocks.repair();
         println!("{}", blocks.to_string());
+
+        Ok(())
     }
 }

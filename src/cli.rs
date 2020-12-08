@@ -1,6 +1,5 @@
 use clap::{App, Arg, ArgMatches, SubCommand};
-
-pub fn setup<'a>() -> ArgMatches<'a> {
+pub fn get_matches<'a>() -> ArgMatches<'a> {
     App::new("Hamming")
         .about("Encode and decode bytes using Hamming")
         .subcommand(encode_command())
