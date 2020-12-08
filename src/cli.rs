@@ -17,4 +17,6 @@ fn encode_command<'a, 'b>() -> App<'a, 'b> {
 fn decode_command<'a, 'b>() -> App<'a, 'b> {
     SubCommand::with_name("decode")
         .about("Decode a given hamming value; reads from STDIN")
+
 }
+
