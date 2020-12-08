@@ -1,6 +1,6 @@
 use anyhow::bail;
 use clap::ArgMatches;
-use std::io::{Read, Write, stdin, stdout};
+use std::io::{stdin, stdout, Read, Write};
 
 use hamming::blocks::Blocks;
 mod cli;
@@ -12,7 +12,6 @@ fn main() -> anyhow::Result<()> {
         _ => bail!("command not recognized"),
     }
 }
-
 
 fn stdin_input() -> anyhow::Result<Vec<u8>> {
     let mut buff: Vec<u8> = Vec::new();

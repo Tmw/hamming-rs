@@ -64,7 +64,7 @@ impl Block {
     pub fn repair(&mut self) {
         match self.parity() {
             err if err > 0 => self.data ^= 0b1 << 15 - err as u16,
-            _ => ()
+            _ => (),
         }
     }
 }
