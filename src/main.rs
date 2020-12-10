@@ -1,4 +1,4 @@
-use anyhow::bail;
+use anyhow::{bail, Context};
 use clap::ArgMatches;
 use std::io::{stdin, stdout, Read, Write};
 
@@ -30,15 +30,27 @@ fn parse_input(args: &ArgMatches) -> anyhow::Result<Vec<u8>> {
 
 fn encode(args: &ArgMatches) -> anyhow::Result<()> {
     let input = parse_input(args)?;
-
     let blocks: Blocks = Blocks::new(&input[..], false);
     let out = blocks.to_byte_vec();
-    stdout().write_all(out.as_slice())?;
+
+    match args.is_present("raw") {
+        true => stdout().write_all(out.as_slice())?,
+        false => print!("{}", base64::encode(out.as_slice()))
+
+    };
+
     Ok(())
 }
 
 fn decode(args: &ArgMatches) -> anyhow::Result<()> {
     let input = parse_input(args)?;
+
+    let input = match args.is_present("raw") {
+        true => input,
+        false => base64::decode(input)
+            .context("Unable to decode base64 input. Are you sure input is base64 encoded? Tip: Try passing --raw flag")?,
+    };
+
     let mut blocks: Blocks = Blocks::new(&input[..], true);
     &blocks.repair();
     println!("{}", blocks.to_string());
