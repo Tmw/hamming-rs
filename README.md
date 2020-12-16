@@ -57,5 +57,18 @@ FLAGS:
     -V, --version    Prints version information
 ```
 
+### Example
+Encoding it to base64 output
+```bash
+hamming encode "this is an example"
+b6MMmiVmLAY5OXGBeC0coA4rVBglWnYGVLJwAA==
+```
+
+Back to back
+```bash
+hamming encode "this is an example"  | hamming decode
+this is an example
+```
+
 ## License
 [MIT](./LICENSE)
