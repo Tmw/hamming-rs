@@ -30,7 +30,8 @@ fn parse_input(args: &ArgMatches) -> anyhow::Result<Vec<u8>> {
 
 fn encode(args: &ArgMatches) -> anyhow::Result<()> {
     let input = parse_input(args)?;
-    let blocks: Blocks = Blocks::new(&input[..], false);
+    let mut blocks: Blocks = Blocks::new(&input[..], false);
+    blocks.prepare();
     let out = blocks.to_byte_vec();
 
     match args.is_present("raw") {

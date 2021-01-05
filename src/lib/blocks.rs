@@ -23,7 +23,7 @@ impl Blocks {
 
         // iterate until theres no more bits
         while bits.peek().is_some() {
-            let block = (0..16u8)
+            let block = (0..16_u8)
                 .rev()
                 .filter(|bit| is_raw || !Blocks::is_parity_bit(15 - bit))
                 .fold(0u16, |block, bit| match bits.next() {
@@ -55,6 +55,13 @@ impl Blocks {
         }
     }
 
+    /// Prepare all blocks (calculate and apply parity bits on them)
+    pub fn prepare(&mut self) {
+        for block in &mut self.0 {
+            block.prepare();
+        }
+    }
+
     /// return the blocks in a vec of bools. Optionally strip out
     /// the parity bits by passing `strip_from_parity` true.
     fn serialize(&self, strip_from_parity: bool) -> Vec<bool> {
@@ -75,7 +82,7 @@ impl Blocks {
                 chunk
                     .iter()
                     .enumerate()
-                    .fold(0u8, |byte, (idx, bit)| match bit {
+                    .fold(0_u8, |byte, (idx, bit)| match bit {
                         true => byte | 0b1 << 7 - idx,
                         false => byte | 0b0 << 7 - idx,
                     })
@@ -138,29 +145,36 @@ mod blocks_test {
 
     #[test]
     fn to_byte_vec_returns_raw_vec_of_u8() {
-        let data = [0xff, 0xff];
+        let data = [0b11001100, 0b11001100];
         let blocks = Blocks::new(&data, true);
 
-        assert_eq!(blocks.to_byte_vec(), vec![0xff, 0xff])
+        assert_eq!(blocks.to_byte_vec(), vec![0b11001100, 0b11001100])
     }
 
     #[test]
     fn to_byte_vec_returns_prepared_vec_of_u8() {
         let data = [0xff, 0xff];
-        let blocks = Blocks::new(&data, false);
+        let mut blocks = Blocks::new(&data, false);
+        blocks.prepare();
 
         assert_eq!(blocks.to_byte_vec(), vec![0x7f, 0xff, 0x3f, 0xc0])
     }
 
     #[test]
     fn back_to_back() {
-        // encode
         let data = "some bytes";
-        let blocks = Blocks::new(data.as_bytes(), false);
-        let raw_bytes = blocks.to_byte_vec();
+        let mut blocks = Blocks::new(data.as_bytes(), false);
+        blocks.prepare();
+        let mut raw_bytes = blocks.to_byte_vec();
+
+        // introduce random noise
+        for chunk in raw_bytes.chunks_mut(2) {
+            chunk[0] ^= 0b1 << rand::random::<u8>() % 7;
+        }
 
         // decode
-        let decode_blocks = Blocks::new(raw_bytes.as_slice(), true);
+        let mut decode_blocks = Blocks::new(raw_bytes.as_slice(), true);
+        decode_blocks.repair();
         assert_eq!(decode_blocks.to_string(), data);
     }
 }

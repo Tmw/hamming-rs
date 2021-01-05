@@ -6,9 +6,7 @@ pub struct Block {
 
 impl From<u16> for Block {
     fn from(data: u16) -> Self {
-        let mut block = Block { data: data };
-        block.prepare();
-        block
+        Block { data: data }
     }
 }
 
@@ -74,19 +72,6 @@ mod block_test {
     use super::Block;
 
     #[test]
-    fn from_u16_prepares_a_block() {
-        let data: u16 = 0b00010101001110011;
-        let block = Block::from(data);
-
-        // ensure we have a prepared block with correct parity bits set
-        assert_eq!(block.data, 0b110101011110011);
-
-        // calculating parity on a block that already has parity
-        // should return 0 indicating a fully prepared block.
-        assert_eq!(block.parity(), 0)
-    }
-
-    #[test]
     fn flip_random_bit_flips_a_random_bit() {
         let data: u16 = 0b00010101001110011;
         let mut block = Block::from(data);
@@ -99,8 +84,11 @@ mod block_test {
 
     #[test]
     fn repair_repairs_broken_block() {
-        let data: u16 = 0b00010101001110011;
+        const DATA_MASK: u16 = 0b0001011101111111;
+        let data = rand::random::<u16>() & DATA_MASK;
         let mut block = Block::from(data);
+        block.prepare();
+
         let original_data = block.data;
         flip_random_bit(&mut block);
         block.repair();
@@ -109,6 +97,7 @@ mod block_test {
     }
 
     fn flip_random_bit(block: &mut Block) {
-        block.data ^= 0b1 << rand::random::<u8>() % 15
+        let which_random_bit = rand::random::<u8>() % 15;
+        block.data ^= 0b1 << which_random_bit;
     }
 }
